@@ -1,6 +1,15 @@
 # MIG-GT
 
-Source code for MIG-GT.
+Source code and dataset of the paper "[Modality-Independent Graph Neural Networks with Global Transformers for Multimodal Recommendation](https://arxiv.org/abs/2412.13994)", which is accepted by AAAI 2025.
+
+
+
+## Homepage and Paper
+
++ Homepage (MIG-GT): https://github.com/CrawlScript/MIG-GT
++ Paper Access:
+    - **ArXiv**: [https://arxiv.org/abs/2412.13994](https://arxiv.org/abs/2412.13994) 
+
 
 
 ## Dataset
