@@ -39,3 +39,11 @@ The dataset is the same as the one used in the paper 'A Tale of Two Graphs: Free
 python main.py --gpu 0 --seed 1 --dataset $DATASET --result_dir results --method mig_gt
 # Note: $DATASET can be 'baby', 'sports', or 'clothing'.
 ```
+
+
+
+
+__License:__ [GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html)
+
+Copyright (c) 2023-2024 Xtra Computing Group, NUS, Singapore.
+
