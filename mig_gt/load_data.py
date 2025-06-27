@@ -38,7 +38,7 @@ def convert_freedom_dataset_to_common(split_dataset, num_users, mask_datasets):
     
 
 
-
+# 加载、划分数据集
 def load_data(dataset):
     config_dict = {}
     config = Config("FREEDOM", dataset, config_dict)
@@ -49,11 +49,12 @@ def load_data(dataset):
     logger.info('██Dir: \t' + os.getcwd() + '\n')
     logger.info(config)
 
-    # load data
+    # 加载数据集
     dataset = RecDataset(config)
-    # print dataset statistics
+    # 打印数据集统计信息
     logger.info(str(dataset))
 
+    # 分割数据集为：训练集、验证集、测试集
     train_dataset, valid_dataset, test_dataset = dataset.split()
     logger.info('\n====Training====\n' + str(train_dataset))
     logger.info('\n====Validation====\n' + str(valid_dataset))
@@ -62,12 +63,13 @@ def load_data(dataset):
     num_users = dataset.user_num
     num_items = dataset.item_num
 
+    # 用户-物品交互边、每个用户的交互物品{user_id: [item_id1, item_id2, ...]}，需要屏蔽的交互（验证/测试时不可见的物品）
     train_user_item_edges, train_user_items_dict, train_mask_user_items_dict = convert_freedom_dataset_to_common(train_dataset, num_users, [valid_dataset, test_dataset])
     valid_user_item_edges, valid_user_items_dict, valid_mask_user_items_dict = convert_freedom_dataset_to_common(valid_dataset, num_users, [train_dataset, test_dataset])
     test_user_item_edges, test_user_items_dict, test_mask_user_items_dict = convert_freedom_dataset_to_common(test_dataset, num_users, [train_dataset, valid_dataset])
 
 
-
+    # 加载多模态特征（文本、图像）
     v_feat, t_feat = None, None
     if not config['end2end'] and config['is_multimodal_model']:
         dataset_path = os.path.abspath(config['data_path'] + config['dataset'])

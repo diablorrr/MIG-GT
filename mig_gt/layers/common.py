@@ -2,31 +2,30 @@ from torch import nn
 import torch
 import torch.nn.functional as F
 
+# 自定义线性层
 class MyLinear(nn.Linear):
     # pass
+    # 重写 nn.Linear 的 reset_parameters方法
     def reset_parameters(self) -> None:
+        # 权重初始化方法从默认的 Kaiming -> xavier_uniform_(均匀分布)
         nn.init.xavier_uniform_(self.weight)
-
-        # print("init weight:")
-        # print(self.weight)
-        # asdfasdfadf
-
-        # nn.init.xavier_normal_(self.weight)
         if self.bias is not None:
             nn.init.zeros_(self.bias)
 
 
 
-
+# 自定义线性层
 class MyNormalLinear(nn.Linear):
     # pass
+    # 重写 nn.Linear 的 reset_parameters方法
     def reset_parameters(self) -> None:
-        # nn.init.xavier_uniform_(self.weight)
+        # 权重初始化方法从默认的 Kaiming -> xavier_uniform_(正态分布)
         nn.init.xavier_normal_(self.weight)
         if self.bias is not None:
             nn.init.zeros_(self.bias)
 
 
+# 自定义激活函数
 class MyPReLU(nn.Module):
 
     __constants__ = ['num_parameters']
@@ -48,6 +47,7 @@ class MyPReLU(nn.Module):
         return 'num_parameters={}'.format(self.num_parameters)
 
 
+# 创建神经网络中的自定义操作
 class Lambda(nn.Module):
     def __init__(self, func) -> None:
         super().__init__()
@@ -56,7 +56,9 @@ class Lambda(nn.Module):
 
     def forward(self, x):
         return self.func(x)
-        
+
+
+# 工厂函数：创建激活函数
 def create_act(name=None):
     if name == "softmax":
         return nn.Softmax(dim=-1)
@@ -68,12 +70,7 @@ def create_act(name=None):
         raise Exception()
 
 
-# class MyLinear(nn.Linear):
-#     def reset_parameters(self) -> None:
-#         nn.init.xavier_normal_(self.weight)
-#         nn.init.zeros_(self.bias)
-
-
+# 工厂函数：创建激活函数（支持激活函数的类型不同）
 def get_activation(activation):
     if activation == "prelu":
         return MyPReLU()
@@ -86,7 +83,7 @@ def get_activation(activation):
     
 
 
-
+# 自定义多层感知机
 class MyMLP(nn.Module):
     def __init__(self, in_channels, units_list, activation, drop_rate, bn, output_activation, output_drop_rate, output_bn, ln=False, output_ln=False):
         super().__init__()
@@ -95,10 +92,9 @@ class MyMLP(nn.Module):
         units_list = [in_channels] + units_list  # Add in_channels to the list of units
 
         for i in range(len(units_list) - 1):
-            layers.append(MyLinear(units_list[i], units_list[i+1]))  # Create a linear layer
-            # layers.append(MyNormalLinear(units_list[i], units_list[i+1]))  # Create a linear layer
+            layers.append(MyLinear(units_list[i], units_list[i+1]))  # 添加线性层
 
-
+            # 最后一层
             if i < len(units_list) - 2:
                 if bn:
                     layers.append(nn.BatchNorm1d(units_list[i+1]))  # Add a batch normalization layer
@@ -108,6 +104,7 @@ class MyMLP(nn.Module):
                 
                 layers.append(get_activation(activation))  # Add the PReLU activation function
                 layers.append(nn.Dropout(drop_rate))
+            # 非最后一层
             else:
                 if output_bn:
                     layers.append(nn.BatchNorm1d(units_list[i+1]))

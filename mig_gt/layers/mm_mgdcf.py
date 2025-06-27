@@ -55,6 +55,7 @@ class MMMLP(nn.Module):
 
         return item_h      
 
+# mig方法用的模型
 class MMMGDCF(nn.Module):
     def __init__(self, 
                 #  k, 

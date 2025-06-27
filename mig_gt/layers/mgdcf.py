@@ -30,19 +30,22 @@ class MGDCF(nn.Module):
         self.k = k
         self.alpha = alpha
         self.beta = beta
+        # 计算归一化系数
         self.gamma = torch.tensor(MGDCF.compute_gamma(alpha, beta, k)).float()
-
         self.gammas =[torch.tensor(MGDCF.compute_gamma(alpha, beta, i)).float() for i in range(1, k+1)]
 
         self.x_drop_rate = x_drop_rate
         self.edge_drop_rate = edge_drop_rate
         self.z_drop_rate = z_drop_rate
 
+        # droupout
         self.x_dropout = nn.Dropout(x_drop_rate)
         self.edge_dropout = nn.Dropout(edge_drop_rate)
         self.z_dropout = nn.Dropout(z_drop_rate)
 
 
+
+    # 计算归一化系数
     @classmethod
     def compute_gamma(cls, alpha, beta, k):
         return np.power(beta, k) + alpha * np.sum([np.power(beta, i) for i in range(k)])
@@ -71,10 +74,12 @@ class MGDCF(nn.Module):
         
     #     return g
 
+    # 生成同构图
     @classmethod
     def build_sorted_homo_graph(cls, user_item_edges, num_users=None, num_items=None):
-
-        user_index, item_index = user_item_edges.T
+        # 用户-物品边(行：用户、物品；列：交互数) 转置后 (行：用户；列：物品)
+        # 因此用于快速分离 所有 用户ID 和 物品ID
+        user_index, item_index = user_item_edges.T # .T是转置张量
 
         if num_users is None:
             num_users = np.max(user_index) + 1
@@ -85,9 +90,12 @@ class MGDCF(nn.Module):
         user_index = torch.tensor(user_index)
         item_index = torch.tensor(item_index)
 
+        # 图的总节点数
         num_homo_nodes = num_users + num_items
+        # 重新映射物品ID [1,2,3] -> [10,20,30] ；目的：用户和物品在图中视为同一类型节点，但ID不重叠
         homo_item_index = item_index + num_users
-
+        # 上下代码对照看：正向边（user_index->homo_item_index）反向边（homo_item_index->user_index）自环边（num_homo_nodes->num_homo_nodes）
+        # 双向边用于信息双向传播，自环边用于保留节点自身信息
         src = torch.concat([user_index, homo_item_index, torch.arange(num_homo_nodes)], dim=0)
         dst = torch.concat([homo_item_index, user_index, torch.arange(num_homo_nodes)], dim=0)
 
@@ -102,7 +110,7 @@ class MGDCF(nn.Module):
         
         return g
 
-
+    # 对邻接矩阵进行归一化，避免度数高的节点主导消息传递
     @classmethod
     @torch.no_grad()
     def norm_adj(cls, g):
@@ -129,6 +137,7 @@ class MGDCF(nn.Module):
     def forward(self, g, x, return_all=False):
 
         CACHE_KEY = MGDCF.CACHE_KEY
+        # 归一化边权重
         MGDCF.norm_adj(g)
 
         edge_weight = g.edata[CACHE_KEY]
@@ -137,7 +146,7 @@ class MGDCF(nn.Module):
         # print(edge_weight)
         # asdfadsf
 
-        h0 = self.x_dropout(x)
+        h0 = self.x_dropout(x) # 输入嵌入
         h = h0
 
         if return_all:
@@ -145,13 +154,16 @@ class MGDCF(nn.Module):
 
         with g.local_scope():
             g.edata[CACHE_KEY] = dropped_edge_weight
-            
-            for _ in range(self.k):
 
+            # 迭代扩散k此
+            for _ in range(self.k):
                 g.ndata["h"] = h
+
+                # NOTE 消息传递
                 g.update_all(fn.u_mul_e("h", CACHE_KEY, "m"), fn.sum("m", "h"))
                 h = g.ndata.pop("h")
 
+                # 加权更新
                 h = h * self.beta + h0 * self.alpha
 
                 if return_all:

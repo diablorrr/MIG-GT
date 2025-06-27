@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-
+# NOTE transformer模块：包含多头注意力机制、前馈神经网络、残差连接、层归一化
 class Transformer(nn.Module):
     def __init__(self, in_units, att_units, out_units, 
                  ff_units_list,
@@ -34,12 +34,12 @@ class Transformer(nn.Module):
         self.ff_units_list = ff_units_list
 
         # ff_units_list = [out_units] + ff_units_list
-
+        #  归一化
         if ln:
             self.ln = nn.LayerNorm(out_units)
         else:
             self.ln = None
-
+        # Dropout
         self.att_h_dropout = nn.Dropout(att_h_drop_rate)
         self.dropout = nn.Dropout(drop_rate)
         self.att_dropout = nn.Dropout(att_drop_rate)
@@ -47,6 +47,7 @@ class Transformer(nn.Module):
         if len(ff_units_list) == 0:
             self.ff = None
         else:
+            # 前馈网络
             self.ff = MyMLP(out_units, ff_units_list, 
                             activation="prelu", 
                             drop_rate=drop_rate,
@@ -75,66 +76,63 @@ class Transformer(nn.Module):
 
 
 
-        
-
     def forward(self, q, k, return_all=False):
-
+        # 投影Q、K，V直接使用k
         Q = self.q_linear(q)
         K = self.k_linear(k)
         V = k
-
+        # 多头拆分Q、K、V（沿着特征维度分割）
         Q_ = torch.concat(Q.split(Q.size(-1) // self.num_heads, dim=-1), dim=0)
         K_ = torch.concat(K.split(K.size(-1) // self.num_heads, dim=-1), dim=0)
         V_ = torch.concat(V.split(V.size(-1) // self.num_heads, dim=-1), dim=0)
 
+        # 多头注意力机制核心计算过程
+        # 计算注意力分数
         sim = Q_ @ K_.transpose(-2, -1)
         sim /= Q_.size(-1) ** 0.5
-
-
-        sim_logits = sim
-
+        sim_logits = sim # 保存原始分数，用于可视化注意力分析
+        # 计算注意力权重
         sim = F.softmax(sim, dim=-1)
-
+        # 注意力dropout
         sim = self.att_dropout(sim)
-
+        # 使用注意力权重对V进行加值求和
         att_h = sim @ V_
-
+        # 合并多头注意力输出
         att_h = torch.concat(att_h.split(q.size(0), dim=0), dim=-1)
 
-        no_residual_att_h = att_h
+        no_residual_att_h = att_h # 保存未加残差连接的注意力输出
 
 
-
+        # 加权残差连接（非标准实现！）
         if self.att_residual:
             # att_h = att_h + q
-            att_h = att_h * 0.1 + q * 0.9
+            att_h = att_h * 0.1 + q * 0.9 # 保留百分之90原输入
             # att_h = q
     
-
+        # 层归一化
         if self.ln is not None:
             att_h = self.ln(att_h)
 
 
         att_h = self.att_h_dropout(att_h)
 
-        
+
+        # 前馈网络处理
         if self.ff is None:
             ff_h = att_h
         else:
             # ff_h = self.ff(att_h)
 
-            
             ff_h = self.ff(att_h.squeeze(1)).unsqueeze(1)
 
             if self.ff_residual:
-                ff_h = ff_h + att_h
-
+                ff_h = ff_h + att_h # 标准残差连接
 
             if self.output_ln:
-                ff_h = self.output_ln(ff_h)
+                ff_h = self.output_ln(ff_h) # 归一化
 
-            ff_h = self.output_activation(ff_h)
-            ff_h = self.output_dropout(ff_h)
+            ff_h = self.output_activation(ff_h) # 激活函数
+            ff_h = self.output_dropout(ff_h) # dropout
 
         if return_all:
             return ff_h, no_residual_att_h, sim_logits
@@ -142,7 +140,7 @@ class Transformer(nn.Module):
             return ff_h
         
 
-
+# 多模态多层感知机：处理多模态数据（文本、图像）
 class MMMLP(nn.Module):
     def __init__(self, 
                  feat_drop_rate, 
@@ -193,7 +191,7 @@ class MMMLP(nn.Module):
 
 
 
-
+# NOTE mig_gt方法
 class MIGGT(nn.Module):
     def __init__(self, 
                 #  k, 
@@ -306,8 +304,6 @@ class MIGGT(nn.Module):
         )
 
         self.t_ff = nn.Sequential(
-
-
             MyMLP(
                 item_t_in_channels, 
                 item_t_hidden_channels_list,
@@ -321,7 +317,6 @@ class MIGGT(nn.Module):
         )
 
         self.v_ff = nn.Sequential(
-            
             MyMLP(
                 item_v_in_channels, 
                 item_v_hidden_channels_list,
@@ -344,12 +339,9 @@ class MIGGT(nn.Module):
 
     def forward(self, g, user_embeddings, item_v_feat, item_t_feat, item_embeddings=None, return_all=False):
 
-
-
         item_v_feat = self.input_feat_dropout(item_v_feat)
         item_t_feat = self.input_feat_dropout(item_t_feat)
 
-      
 
         encoded_t = self.t_ff(item_t_feat)
         encoded_v = self.v_ff(item_v_feat)
@@ -357,7 +349,6 @@ class MIGGT(nn.Module):
 
         num_users = user_embeddings.size(0)
         user_h = user_embeddings
-
 
 
         if self.emb_mgdcf is not None:

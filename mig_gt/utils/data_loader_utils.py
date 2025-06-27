@@ -41,7 +41,7 @@ def extract_zip(input_zip_path, output_path):
     with zipfile.ZipFile(input_zip_path, 'r') as zip_ref:
         zip_ref.extractall(output_path)
 
-
+# 将张量封装成PyTorch的DataLoader
 def create_tensor_dataloader(tensor, batch_size=None, shuffle=False):
     dataset = TensorDataset(tensor)
     if shuffle:
@@ -53,11 +53,14 @@ def create_tensor_dataloader(tensor, batch_size=None, shuffle=False):
                         collate_fn=lambda batchs: batchs[0][0]
                         )
 
+# 将可变数量的张量封装成PyTorch的DataLoader
 def create_tensors_dataloader(*tensor, batch_size=None, shuffle=False):
     dataset = TensorDataset(*tensor)
     if shuffle:
+        # 打乱数据顺序，用于训练
         sampler = RandomSampler(dataset)
     else:
+        # 保持原始顺序，用于验证/测试
         sampler = SequentialSampler(dataset)
     return DataLoader(dataset, 
                         sampler=BatchSampler(sampler, batch_size=batch_size, drop_last=False),
