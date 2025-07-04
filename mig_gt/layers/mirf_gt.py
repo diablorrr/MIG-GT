@@ -333,8 +333,6 @@ class MIGGT(nn.Module):
         self.input_feat_dropout = nn.Dropout(input_feat_drop_rate)
 
         self.ema_alpha = 0.1
-        self.gate = GatedMultimodalLayer()
-
 
       
 
@@ -393,14 +391,13 @@ class MIGGT(nn.Module):
 
       
         combined_h = None
-        combined_h = self.gate(t_h,v_h) + emb_h
-        # for i, h in enumerate([emb_h, t_h, v_h]):
-        #     if h is not None:
-        #         # print("combine index:", i)
-        #         if combined_h is None:
-        #             combined_h = h
-        #         else:
-        #             combined_h  = combined_h + h
+        for i, h in enumerate([emb_h, t_h, v_h]):
+            if h is not None:
+                # print("combine index:", i)
+                if combined_h is None:
+                    combined_h = h
+                else:
+                    combined_h  = combined_h + h
 
 
         combined_h = self.z_dropout(combined_h)
@@ -431,32 +428,4 @@ class MIGGT(nn.Module):
             return combined_h, emb_h, t_h, v_h, encoded_t, encoded_v, z_memory_h
         else:
             return combined_h
-
-
-class GatedMultimodalLayer(nn.Module):
-    def __init__(self,  size_out=64):
-        super(GatedMultimodalLayer, self).__init__()
-        # self.size_in1, self.size_in2, self.size_out = 64, 64, size_out
-
-        self.hidden1 = nn.Linear(64, size_out, bias=False)
-        self.hidden2 = nn.Linear(64, size_out, bias=False)
-        self.hidden_sigmoid = nn.Linear(128, 1, bias=False)
-        self.dropout = nn.Dropout(0.2)
-
-        # Activation functions
-        self.tanh_f = nn.Tanh()
-        self.sigmoid_f = nn.Sigmoid()
-
-    def forward(self, x1, x2):
-        h1 = self.tanh_f(self.hidden1(x1))
-        h2 = self.tanh_f(self.hidden1(x2))
-        h1 = self.dropout(h1)
-        h2 = self.dropout(h2)
-        x = torch.cat((h1, h2), dim=1)
-        z = self.sigmoid_f(self.hidden_sigmoid(x))
-
-        return z.view(z.size()[0], 1) * h1 + (1 - z).view(z.size()[0], 1) * h2
-
-            
-
-        
+  
