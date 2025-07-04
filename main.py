@@ -14,6 +14,7 @@ import torch.nn.functional as F
 from mig_gt.layers.mirf_gt import MIGGT
 from mig_gt.vector_search.vector_search import VectorSearchEngine
 
+import matplotlib.pyplot as plt
 
 
 # 解析命令行参数
@@ -272,8 +273,9 @@ run_log_dir = "run_logs"
 run_log_fname = "{}.json".format(args.dataset)
 # 完整日志文件路径
 run_log_fpath = os.path.join(run_log_dir, run_log_fname)
-
-
+# 收集：训练损失、验证损失
+train_loss = []
+valid_loss = []
 # NOTE 图神经网络推荐系统训练流程：
 for epoch in range(1, config.num_epochs + 1):
 
@@ -327,20 +329,23 @@ for epoch in range(1, config.num_epochs + 1):
   
     # NOTE 每轮epoch的日志
     print("epoch = {}\tloss = {:.4f}\tmf_loss = {:.4f}\tl2_loss = {:.4f}\tupdated_lr = {:.4f}\tepoch_time = {:.4f}s\tpcount = {}"
-          .format(epoch, loss.item(), mf_losses.mean().item(), l2_loss.item(), optimizer.param_groups[0]['lr'], epoch_end_time-epoch_start_time, patience_count))
-    
+       .format(epoch, loss.item(), mf_losses.mean().item(), l2_loss.item(), optimizer.param_groups[0]['lr'], epoch_end_time-epoch_start_time, patience_count))
+    # 记录训练损失
+    train_loss.append(loss.item())
     # NOTE 早停机制
     if epoch % config.validation_freq == 0:
         print("\nEvaluation before epoch {} ......".format(epoch))
-
+        # 验证集
         valid_results_dict = evaluate(valid_user_items_dict, valid_mask_user_items_dict)
         print("valid_results_dict = ", valid_results_dict)
+        # 记录验证损失
+        valid_loss.append(valid_results_dict)
 
 
         current_score = valid_results_dict[early_stop_metric]
         # 性能提升
         if current_score > best_valid_score:
-
+            # 测试集
             test_results_dict = evaluate(test_user_items_dict, test_mask_user_items_dict)
             print("test_results_dict = ", test_results_dict)
 
@@ -359,6 +364,26 @@ for epoch in range(1, config.num_epochs + 1):
             if patience_count >= config.patience:
                 print("Early stopping at epoch {} ......".format(epoch))
                 break
-        
 
+plt.figure(figsize=(8, 5))
+plt.plot(train_loss)
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.title("Training Loss")
+plt.savefig("train_val_loss.png")
 
+val_epochs = [i * config.validation_freq for i in range(len(valid_loss))]
+plt.figure(figsize=(8, 5))
+recall_10 = [v['recall@10'] for v in valid_loss]
+recall_20 = [v['recall@20'] for v in valid_loss]
+ndcg_10 = [v['ndcg@10'] for v in valid_loss]
+ndcg_20 = [v['ndcg@10'] for v in valid_loss]
+plt.plot(val_epochs, recall_10, marker='o', label='Recall@10')
+plt.plot(val_epochs, recall_20, marker='s', label='Recall@20')
+plt.plot(val_epochs, ndcg_10, marker='^', label='NDCG@10')
+plt.plot(val_epochs, ndcg_20, marker='x', label='NDCG@20')
+plt.xlabel('Epochs')
+plt.ylabel('Metrics')
+plt.title("Validation Metrics")
+plt.legend()
+plt.savefig("valid_metrics.png")
